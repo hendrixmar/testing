@@ -8,13 +8,14 @@ from redis.lock import Lock
 async def task(lock, num, value):
     # acquire the lock to protect the critical section
 
-    locking_redis = connection.lock(name="bruh", sleep=0.2)
-
+    locking_redis = await connection.lock(name="bruh", sleep=1).acquire(blocking=True)
+    print(f"LOCKed {num}")
     print(f'>coroutine {num} got the lock, sleeping for {value}')
     # block for a moment
     await asyncio.sleep(value)
-    print(f"LOCKed {num}")
 
+
+    locking_redis = await connection.lock(name="bruh", sleep=1).release()
     print(f"unLOCKed {num}")
 
 
