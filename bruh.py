@@ -3,9 +3,7 @@ import asyncio
 
 # Define a list of connections to your Redis instances:
 redis_instances = [
-
   'redis://default:eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81@localhost:6379',
-
 ]
 
 async def main():

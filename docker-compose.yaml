@@ -1,27 +1,14 @@
-version: '3.8'
 services:
-  cache:
-    image: redis:6.2-alpine
-    restart: always
-    ports:
-      - '6379:6379'
-    command: redis-server --save 20 1 --loglevel warning --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
-    environment:
-      - REDIS_URL=redis://redis_db:6379
-
-    volumes:
-      - cache:/data
-
-  web:
-    build: .
-    command: python main.py
-    volumes:
-      - ./:/usr/src/app
-    environment:
-
-      - PORT=8000
-    depends_on:
-      - cache
-volumes:
-  cache:
-    driver: local
+   redis: 
+     image: redislabs/redismod
+     container_name: redis
+     ports:
+       - '6379:6379' 
+   flask:
+        build: .
+        command: python main.py
+        container_name: bruh
+        volumes:
+            - .:/code
+        depends_on:
+            - redis

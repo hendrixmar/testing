@@ -7,7 +7,7 @@ from aioredlock import Aioredlock
 
 
 redis_instances = [
-    'redis://redis:eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81@0.0.0.0:6379',
+         ('localhost', 6379),
 ]
 
 
