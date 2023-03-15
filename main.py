@@ -1,13 +1,13 @@
 # SuperFastPython.com
 # example of an asyncio mutual exclusion (mutex) lock
+import logging
 from random import random, randint
 import asyncio
 
 from aioredlock import Aioredlock
 
-
 redis_instances = [
-         ('localhost', 6379),
+    "redis://default:redispw@localhost:32768",
 ]
 
 
@@ -15,12 +15,15 @@ redis_instances = [
 async def task(lock, num, value):
     # acquire the lock to protect the critical section
 
-    while await lock_manager.is_locked("resource_name"):
-        async with lock:
-            print(f'>coroutine {num} got the lock, sleeping for {value}')
-            # block for a moment
-            await asyncio.sleep(value)
-        print(f"LOCKed {num}")
+    async with await lock_manager.lock("resource") as lock:
+        assert lock.valid is True
+        assert await lock_manager.is_locked("resource") is True
+        # Do your stuff having the lock
+        await asyncio.sleep(lock_manager.internal_lock_timeout * 2)
+        # lock manager will extend the lock automatically
+        assert await lock_manager.is_locked(lock)
+        # or you can extend your lock's lifetime manually
+        await lock.extend()
 
     print(f"unLOCKed {num}")
 
@@ -39,7 +42,5 @@ async def main():
 
 lock_manager = Aioredlock(redis_instances)
 # run the asyncio program
-
+logging.basicConfig(level=logging.DEBUG)
 asyncio.run(main())
-
-

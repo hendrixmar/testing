@@ -1,14 +1,8 @@
 services:
-   redis: 
-     image: redislabs/redismod
-     container_name: redis
-     ports:
-       - '6379:6379' 
+
    flask:
         build: .
         command: python main.py
         container_name: bruh
         volumes:
             - .:/code
-        depends_on:
-            - redis
