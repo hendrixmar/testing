@@ -75,7 +75,7 @@ async def task(lock, num, value):
     print("bruh")
     from redis.asyncio.lock import Lock
 
-    async with connection.lock(name="amlo", sleep=1):
+    async with connection.lock(name="amlo", sleep=0.3):
         print(f"acquired {num}")
 
 
