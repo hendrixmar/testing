@@ -1,73 +1,140 @@
+import abc
 import asyncio
-import logging
-from random import random, randint
+import time
+import random
+from pprint import pprint
+
+from random import randint
+from typing import Any, Union, Optional, Dict, Callable
 
 import redis.asyncio as redis
 from redis import Redis
 
 from redis.exceptions import LockError
+import sys
 
-connection = Redis(port=32768, password="redispw")
-async_connection = redis.Redis(port=32768, password="redispw")
-
-from redis.lock import Lock
-
-import base64
-import binascii
 import logging
-from typing import Any, Optional
-from redis.asyncio.lock import Lock
-import redis
+
 from redis.lock import Lock
 
+connection = Redis()
+async_connection = redis.Redis()
 
-class PimpMyLock(Lock):
 
-    async def __aenter__(self):
-        if await self.acquire():
-            return self
-        raise LockError("Unable to acquire lock within the time specified")
+class ReadWriteLockInterface(abc.ABC):
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        temp = await self.owned()
+    @abc.abstractmethod
+    def distributed_read(self, key: str, key_lock: Optional[str]) -> Any:
+        raise NotImplementedError
 
-        if temp:
-            self.release()
+    @abc.abstractmethod
+    def distributed_write(self, key: str,
+                          old_value: Dict[str, Any],
+                          callable_process: Callable[[Any], Dict],
+                          key_lock: Optional[str] = None) -> bool:
+        raise NotImplementedError
+
+
+class RedisRepository(ReadWriteLockInterface):
+
+    def __init__(self):
+        self.__redis_async_connection = redis.Redis()
+        self.__redis_connection = Redis()
+        self.__sleep_time = 0.000001
+
+    async def distributed_write(self,
+                                key: str,
+                                old_value: Dict[str, Any],
+                                callable_resource: Callable[[Any], Dict],
+                                key_lock: Optional[str] = None) -> Optional[Dict]:
+        key_lock = key_lock or f"{key}_lock"
+
+        def decoder(elements: Dict[str, Any]) -> Dict[str, Any]:
+            temp = {}
+            for k, v in elements.items():
+                if isinstance(k, bytes):
+                    k = k.decode()
+                if isinstance(v, bytes):
+                    v = v.decode()
+                temp.update({k: v})
+
+            return temp
+
+        with self.__redis_connection.lock(name=key_lock):
+
+            if decoder(self.__redis_connection.hgetall(key)) == old_value:
+                value = callable_resource()
+                self.__redis_connection.hset(name=key,
+                                             mapping={"name": value})
+                return {"name": value}
+
+        return None
+
+    async def distributed_read(self,
+                               key: str,
+                               key_lock: Optional[str] = None) -> Any:
+
+        key_lock = key_lock or f"{key}_lock"
+        while self.__redis_connection.lock(name=key_lock).locked():
+            await asyncio.sleep(0.0001)
+
+        return await self.__redis_async_connection.hgetall(key)
 
 
 import time
 
+# hset uniteller name 'el pepe'
+import itertools
 
-async def task(lock, num, value):
+
+async def task(num, value):
     # acquire the lock to protect the critical section
     print(f"task {num}")
     from redis.asyncio.lock import Lock
     # <Handle <TaskStepMethWrapper object at 0x106137eb0>()>
 
-    if connection.lock(name="amlo", sleep=1).locked():
+    if fetched_data := await lol.distributed_read("uniteller"):
+        return fetched_data
 
-        print(f"sleeping {num}")
-    else:
-        with connection.lock(name="amlo", blocking=False) as locker:
-            if not connection.get("ñema"):
-                print(f"Winner acquired {num}")
-                await async_connection.set("ñema", f"task {num}")
-                return
+    if result := await lol.distributed_write("uniteller", {}, lambda: value):
+        print(f"Winner acquired {value}")
+        return result
+
+    return await lol.distributed_read("uniteller")
 
 
 async def main():
     # create a shared lock
-    lock = asyncio.Lock()
+
     # create many concurrent coroutines
     import random
-    coros = [task(lock, (i, e), randint(1, 3)) for i, e in enumerate(random.sample(range(100), k=100))]
-    print(coros)
+    n = 1000
+    coros = [task(i, i) for i in range(n)]
+
     # execute and wait for tasks to complete
 
-    await asyncio.gather(*coros)
-    print(f"\n\nReal winner {connection.get('ñema')}")
-    connection.delete("ñema")
+    bruh = await asyncio.gather(*coros)
 
 
-logging.basicConfig(level=logging.DEBUG)
-asyncio.run(main())
+if __name__ == "__main__":
+    lol = RedisRepository()
+    from time import perf_counter
+
+
+    # Start the stopwatch / counter
+    t1_start = perf_counter()
+
+    asyncio.run(main())
+    # Stop the stopwatch / counter
+    t1_stop = perf_counter()
+    print(f"\n\nReal winner {connection.hgetall('uniteller')}")
+    print("Elapsed time:", t1_stop, t1_start)
+
+    print("Elapsed time during the whole program in seconds:",
+          t1_stop - t1_start)
+    # time.sleep(randint(15,20))
+
+    logging.basicConfig(level=logging.DEBUG)
+
+    print(connection.hgetall("SACA"))
+    connection.delete("uniteller")
